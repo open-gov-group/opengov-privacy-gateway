@@ -1,0 +1,79 @@
+# ---------------------------
+# OS / Editor
+# ---------------------------
+.DS_Store
+Thumbs.db
+Icon?
+._*
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+*.log
+.idea/
+.vscode/
+*.code-workspace
+.eslintcache
+
+# ---------------------------
+# Node / Package Manager
+# (Lockfiles NICHT ignorieren!
+#  package-lock.yaml/pnpm-lock.yaml
+#  bitte versionieren)
+# ---------------------------
+node_modules/
+**/node_modules/
+.pnpm-store/
+.npm/
+.npmrc.local
+
+# ---------------------------
+# Cloudflare / Wrangler / Dev
+# ---------------------------
+.wrangler/
+.mf/                 # Miniflare cache
+.dev.vars            # lokale Env-Variablen für wrangler dev (NIEMALS committen)
+*.dev.vars
+dist/
+build/
+out/
+.cache/
+.tmp/
+
+# Falls ihr Pages-Funktionen im selben Repo habt:
+functions/.cache/
+functions/node_modules/
+
+# ---------------------------
+# Tests / Coverage
+# ---------------------------
+coverage/
+.nyc_output/
+junit.xml
+
+# ---------------------------
+# Env / Secrets / Keys
+# ---------------------------
+.env
+.env.*
+*.secret.*
+secrets/
+tokens/
+private/
+*.key
+*.pem
+*.p12
+*.crt
+
+# ---------------------------
+# Logs / Reports
+# ---------------------------
+*.log
+*.trace
+*.stacktrace
+
+# ---------------------------
+# Docker (falls lokal genutzt)
+# ---------------------------
+docker-data/

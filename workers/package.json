@@ -1,0 +1,11 @@
+{
+  "name": "open-privacy-api-workers",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "^4.47.0"
+  },
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  }
+}
