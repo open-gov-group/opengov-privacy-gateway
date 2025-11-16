@@ -110,6 +110,49 @@ async function openPR(env, branch, title, body, base = "main") {
   return resp.ok ? await resp.json() : null;
 }
 
+// Minimal-JWT-Verify (HS256) ohne Fremdbibliothek
+async function verifyJwtHS256(token, secret, { iss, aud } = {}) {
+  try {
+    const [h64, p64, s64] = token.split(".");
+    if (!h64 || !p64 || !s64) return { ok: false, error: "malformed jwt" };
+
+    const enc = str => new TextEncoder().encode(str);
+    const b64u = s => s.replace(/-/g, "+").replace(/_/g, "/");
+    const toArr = s => Uint8Array.from(atob(b64u(s)), c => c.charCodeAt(0));
+
+    const data = `${h64}.${p64}`;
+    const key = await crypto.subtle.importKey(
+      "raw", enc(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    );
+    const sigOk = await crypto.subtle.verify("HMAC", key, toArr(s64), enc(data));
+    if (!sigOk) return { ok: false, error: "bad signature" };
+
+    const payload = JSON.parse(new TextDecoder().decode(toArr(p64)));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && now >= payload.exp) return { ok: false, error: "expired" };
+    if (iss && payload.iss !== iss) return { ok: false, error: "bad iss" };
+    if (aud && payload.aud !== aud) return { ok: false, error: "bad aud" };
+    return { ok: true, payload };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
+async function requireJWT(request, env) {
+  const auth = request.headers.get("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return { ok: false, error: "missing bearer token" };
+  const token = auth.slice(7).trim();
+  if (!env.APP_API_KEY) return { ok: false, error: "APP_API_KEY missing" }; // shared secret (HS256)
+  const iss = env.JWT_ISS || "open-privacy";
+  const aud = env.JWT_AUD || "open-privacy-api";
+  const res = await verifyJwtHS256(token, env.APP_API_KEY, { iss, aud });
+  return res;
+}
+
+
+
+
+
 // ---- ROUTER ----------------------------------------------------------------
 
 export default {
@@ -174,6 +217,9 @@ export default {
         const prBody = `Automated update via API (${new Date().toISOString()})`;
         const pr = await openPR(env, branch, title, prBody, env.DATA_BASE || "main");
         if (!pr) return serverErr("Failed to open PR");
+
+        const gate = await requireJWT(request, env);
+        if (!gate.ok) return unauthorized(gate.error);
 
         return ok({ ok: true, pr_url: pr.html_url, branch, path: pathInRepo });
       }

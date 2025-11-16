@@ -15,3 +15,8 @@ DATA_REPO  = "opengov-privacy-data"
 DATA_BASE  = "main"
 
 # Secret GH_TOKEN_DATA wird separat gesetzt (siehe unten)
+
+# OPTIONAL (für JWT, siehe unten)
+JWT_ISS = "open-privacy"
+JWT_AUD = "open-privacy-api"
+JWT_ALG = "HS256"   # oder RS256 bei Public/Private Key
