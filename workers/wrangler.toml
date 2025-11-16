@@ -1,0 +1,17 @@
+name = "opengov-privacy-api"
+main = "worker.mjs"
+compatibility_date = "2024-11-01"
+
+[vars]
+# mock|prod
+MODE = "mock"
+
+# Quelle für Mocks (mappings/build/*)
+MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main"
+
+# Ziel-Repo für produktive Daten
+DATA_OWNER = "open-gov-group"
+DATA_REPO  = "opengov-privacy-data"
+DATA_BASE  = "main"
+
+# Secret GH_TOKEN_DATA wird separat gesetzt (siehe unten)
