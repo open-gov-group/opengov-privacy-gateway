@@ -12,14 +12,14 @@ jobs:
         run: |
           pwd
           ls -la
-          echo "--- wrangler.toml ---"
-          sed -n '1,120p' wrangler.toml
+          echo "--- workers/wrangler.toml ---"
+          sed -n '1,120p' workers/wrangler.toml
 
       - uses: actions/checkout@v4
 
       - uses: cloudflare/wrangler-action@v3
         with:
-          workingDirectory: '.'              # Pfad mit wrangler.toml
+          workingDirectory: 'workers'              # Pfad mit wrangler.toml
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.47.0'                # <- Version hier festnageln
