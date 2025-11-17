@@ -25,7 +25,6 @@ jobs:
           wranglerVersion: '4.47.0'                # <- Version hier festnageln
           command: >-
             deploy
-            --config workers/wrangler.toml
             --name open-privacy-api
         env:
           WRANGLER_LOG: debug
