@@ -19,13 +19,13 @@ jobs:
 
       - uses: cloudflare/wrangler-action@v3
         with:
-          workingDirectory: 'workers'              # Pfad mit wrangler.toml
+          workingDirectory: '.'              # Pfad mit wrangler.toml
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.47.0'                # <- Version hier festnageln
           command: >-
             deploy
-            --config wrangler.toml
+            --config workers/wrangler.toml
             --name open-privacy-api
         env:
           WRANGLER_LOG: debug
