@@ -1,4 +1,4 @@
-name: Deploy Cloudflare Worker
+name: Deploy Cloudflare Worker opengov-privacy-api
 on:
   push:
     branches: [ main ]
@@ -8,13 +8,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug files
-        run: |
-          pwd
-          ls -la
-          echo "--- workers/wrangler.toml ---"
-          sed -n '1,120p' workers/wrangler.toml
-
       - uses: actions/checkout@v4
 
       - uses: cloudflare/wrangler-action@v3
@@ -34,6 +27,6 @@ jobs:
           command: >-
             deploy
             --env=staging
-            --name open-privacy-api
+            --name opengov-privacy-api
         env:
           WRANGLER_LOG: debug

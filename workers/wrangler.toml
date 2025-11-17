@@ -1,4 +1,4 @@
-#Wrangler Steuerung --env sensibler Trennung zwischen staging und production in config
+#Wrangler Steuerung --env sensibler Trennung zwischen staging und production - opengov
 name = "opengov-privacy-api"
 main = "worker.mjs"
 compatibility_date = "2024-11-01"
