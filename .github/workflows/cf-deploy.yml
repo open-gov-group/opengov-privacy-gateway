@@ -8,13 +8,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug files
-        run: |
-          pwd
-          ls -la
-          echo "--- wrangler.toml ---"
-          sed -n '1,120p' wrangler.toml
-
       - uses: actions/checkout@v4
 
       - uses: cloudflare/wrangler-action@v3
