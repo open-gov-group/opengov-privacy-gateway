@@ -2,21 +2,41 @@ name = "opengov-privacy-api"
 main = "worker.mjs"
 compatibility_date = "2024-11-01"
 
+# Optional: nur für lokales `wrangler dev` ohne --env
 [vars]
-# mock|prod
 MODE = "mock"
-
-# Quelle für Mocks (mappings/build/*)
 MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main"
-
-# Ziel-Repo für produktive Daten
 DATA_OWNER = "open-gov-group"
 DATA_REPO  = "opengov-privacy-data"
 DATA_BASE  = "main"
+JWT_ISS = "open-privacy-api"
+JWT_AUD = "opengov-privacy-ui"
+JWT_ALG = "HS256"
 
-# Secret GH_TOKEN_DATA wird separat gesetzt (siehe unten)
+# ---- STAGING (Demo / Mock) ----
+[env.staging]
+[env.staging.vars]
+MODE = "mock"
+MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main"
+DATA_OWNER = "open-gov-group"
+DATA_REPO  = "opengov-privacy-data"
+DATA_BASE  = "main"
+JWT_ISS = "open-privacy-api"
+JWT_AUD = "opengov-privacy-ui"
+JWT_ALG = "HS256"
 
-# OPTIONAL (für JWT, siehe unten)
-JWT_ISS = "open-privacy"
-JWT_AUD = "open-privacy-api"
-JWT_ALG = "HS256"   # oder RS256 bei Public/Private Key
+# ---- PRODUCTION (echte Speicherung ins Data-Repo) ----
+[env.production]
+[env.production.vars]
+MODE = "prod"
+# In prod meist kein MOCK_BASE notwendig; falls verwendet, gern eigene Release-URL
+MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main"
+DATA_OWNER = "open-gov-group"
+DATA_REPO  = "opengov-privacy-data"
+DATA_BASE  = "main"
+JWT_ISS = "open-privacy-api"
+JWT_AUD = "opengov-privacy-ui"
+JWT_ALG = "HS256"
+
+
+

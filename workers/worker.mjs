@@ -17,6 +17,12 @@ const JSON_HEADERS = {
   "cache-control": "public, max-age=60, s-maxage=600"
 };
 
+const unauthorized = (msg = "unauthorized") =>
+  new Response(JSON.stringify({ error: "unauthorized", detail: msg }), {
+    status: 401,
+    headers: JSON_HEADERS
+  });
+
 const ok = (data, headers = {}) =>
   new Response(JSON.stringify(data), { status: 200, headers: { ...JSON_HEADERS, ...headers } });
 const notFound = (msg = "not_found") =>
@@ -29,6 +35,12 @@ const serverErr = (msg) =>
 function sanitizeId(s) { return String(s || "").trim().replace(/[^a-zA-Z0-9._-]/g, ""); }
 function nowStamp() { return new Date().toISOString().replace(/[:.]/g, "-"); }
 
+// Set ALLOW_ORIGIN in wrangler.toml [vars]
+function corsHeaders(env) {
+  const h = { ...JSON_HEADERS };
+  if (env.ALLOW_ORIGIN) h["access-control-allow-origin"] = env.ALLOW_ORIGIN;
+  return h;
+}
 async function fetchJson(url, init = {}) {
   const resp = await fetch(url, init);
   if (!resp.ok) return { ok: false, status: resp.status, data: null };
@@ -197,32 +209,41 @@ export default {
       // POST SSP (PR)
       m = path.match(/^\/api\/ssp\/([^/]+)\/([^/]+)$/);
       if (request.method === "POST" && m) {
+        // 0) Auth FIRST
+        const gate = await requireJWT(request, env);
+        if (!gate.ok) return unauthorized(gate.error);
+
         if (!env.GH_TOKEN_DATA) return serverErr("GH_TOKEN_DATA not configured");
         const [_, org, proc] = m;
 
+        // 1) Parse body
         let body;
         try { body = await request.json(); } catch { return badReq("Body must be valid JSON"); }
         if (!body?.["system-security-plan"]) return badReq("Missing 'system-security-plan' root");
 
+        // 2) Git branch
         const branch = `update/${sanitizeId(org)}-${sanitizeId(proc)}-${nowStamp()}`;
         const okBranch = await ensureBranch(env, env.DATA_BASE || "main", branch);
         if (!okBranch) return serverErr("Failed to create branch");
 
+        // 3) Put file
         const pathInRepo = `tenants/${sanitizeId(org)}/procedures/${sanitizeId(proc)}/ssp.json`;
         const msg = `chore(ssp): update ${org}/${proc} via API`;
         const put = await putFile(env, branch, pathInRepo, body, msg);
         if (!put) return serverErr("Failed to write file");
 
+        // 4) PR
         const title = `Update SSP: ${org}/${proc}`;
         const prBody = `Automated update via API (${new Date().toISOString()})`;
         const pr = await openPR(env, branch, title, prBody, env.DATA_BASE || "main");
         if (!pr) return serverErr("Failed to open PR");
 
-        const gate = await requireJWT(request, env);
-        if (!gate.ok) return unauthorized(gate.error);
-
-        return ok({ ok: true, pr_url: pr.html_url, branch, path: pathInRepo });
+        return new Response(JSON.stringify({ ok: true, pr_url: pr.html_url, branch, path: pathInRepo }), {
+          status: 200,
+          headers: corsHeaders(env)
+        });
       }
+
       if (path === "/") {
         return ok({
           name: "open-privacy-api",
