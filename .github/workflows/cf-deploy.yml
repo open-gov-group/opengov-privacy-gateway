@@ -19,7 +19,7 @@ jobs:
 
       - uses: cloudflare/wrangler-action@v3
         with:
-          workingDirectory: '.'              # Pfad mit wrangler.toml
+          workingDirectory: 'workers'              # Pfad mit wrangler.toml
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.47.0'                # <- Version hier festnageln
