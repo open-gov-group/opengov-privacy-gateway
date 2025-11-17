@@ -12,8 +12,8 @@ jobs:
         run: |
           pwd
           ls -la
-          echo "--- workers/wrangler.toml ---"
-          sed -n '1,120p' workers/wrangler.toml
+          echo "--- wrangler.toml ---"
+          sed -n '1,120p' wrangler.toml
 
       - uses: actions/checkout@v4
 
