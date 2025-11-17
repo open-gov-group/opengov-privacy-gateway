@@ -19,12 +19,21 @@ jobs:
 
       - uses: cloudflare/wrangler-action@v3
         with:
-          workingDirectory: 'workers'              # Pfad mit wrangler.toml
+          workingDirectory: workers
+          wranglerVersion: 4.47.0
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.47.0'                # <- Version hier festnageln
+          command: whoami
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          workingDirectory: workers            # ← genau EIN „workers“-Ordner
+          wranglerVersion: 4.47.0
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: >-
             deploy
+            --env=staging
             --name open-privacy-api
         env:
           WRANGLER_LOG: debug
