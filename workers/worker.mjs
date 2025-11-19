@@ -41,12 +41,6 @@ const JSON_HEADERS_BASE = {
   "cache-control": "public, max-age=60, s-maxage=600"
 };
 
-function makeCors(env) {
-  const h = { ...JSON_HEADERS_BASE };
-  h["access-control-allow-origin"] = env.ALLOW_ORIGIN || "*";
-  return h;
-}
-
 const ok = (env, data, extra = {}) =>
   new Response(JSON.stringify(data), { status: 200, headers: { ...makeCors(env), ...extra } });
 
@@ -61,6 +55,16 @@ const unauthorized = (env, msg = "unauthorized") =>
 
 const serverErr = (env, msg) =>
   new Response(JSON.stringify({ error: "server_error", detail: msg }), { status: 500, headers: makeCors(env) });
+
+function makeCors(env) {
+  const h = { ...JSON_HEADERS_BASE };
+  h["access-control-allow-origin"] = env.ALLOW_ORIGIN || "*";
+  return h;
+}
+
+function json(env, status, payload) {
+  return new Response(JSON.stringify(payload), { status, headers: makeCors(env) });
+}
 
 function sanitizeId(s) { return String(s || "").trim().replace(/[^a-zA-Z0-9._-]/g, ""); }
 function nowStamp() { return new Date().toISOString().replace(/[:.]/g, "-"); }
@@ -369,9 +373,7 @@ export async function handlePostTenant(req, env) {
   };
 
   const res = await writeTenantToRepo(env, orgId, tenantJson);
-  return new Response(JSON.stringify({ ok: true, orgId, path: res.path, url: res.rawUrl }, null, 2), {
-    headers: { 'content-type': 'application/json' }
-  });
+    return ok(env, { ok: true, orgId, path: res.path, url: res.rawUrl });
 }
 
 
@@ -416,6 +418,19 @@ async function openPR(env, branch, title, body, base = "main") {
     }
   );
   return resp.ok ? await resp.json() : null;
+}
+
+// Schreibe mehrere Dateien in neuen Branch und öffne PR
+async function writeFilesAsPR(env, branch, title, files, base = "main") {
+  const okBranch = await ensureBranch(env, base, branch);
+  if (!okBranch) return null;
+  for (const f of files) {
+    const contentObj = typeof f.content === 'string' ? JSON.parse(f.content) : f.content;
+    const r = await putFile(env, branch, f.path, contentObj, `chore: add ${f.path}`);
+    if (!r) return null;
+  }
+  const pr = await openPR(env, branch, title, `Automated update via API (${new Date().toISOString()})`, base);
+  return pr?.html_url || null;
 }
 
 // Minimal JWT verify (HS256)
@@ -465,7 +480,7 @@ async function sha256Hex(buf) {
 async function handleInitTenant(env, orgId, payload) {
   // 1) einfache Validierung
   if (!/^[a-z0-9-]{2,64}$/.test(orgId)) {
-    return json(400, { error: 'invalid_orgId' });
+    return json(env, 400, { error: 'invalid_orgId' });
   }
 
   const orgName = (payload?.orgName || '').trim();
@@ -486,10 +501,11 @@ async function handleInitTenant(env, orgId, payload) {
   // 4) Zielpfade im Data-Repo
   const owner = env.DATA_OWNER;                // z.B. "open-gov-group"
   const repo  = env.DATA_REPO;                 // z.B. "opengov-privacy-data"
-  const base  = env.DATA_BASE || 'data';       // z.B. "data"
+  const baseBranch = env.DATA_BASE || 'main';  // Branch (z.B. "main")
+  const dataRoot   = 'data';                   // Root-Verzeichnis im Repo
 
   const bundleId = `bundle-1`;
-  const orgDir   = `${base}/tenants/${orgId}`;
+  const orgDir   = `${dataRoot}/tenants/${orgId}`;
   const files = [
     { path: `${orgDir}/meta.json`, content: JSON.stringify(meta, null, 2) },
     ...(defaultProfileHref ? [{
@@ -502,7 +518,7 @@ async function handleInitTenant(env, orgId, payload) {
   // 5) Commit/PR ins Data-Repo
   const title = `feat(tenant): init ${orgId}`;
   const branch = `init/${orgId}-${Date.now()}`;
-  const prUrl = await writeFilesAsPR(owner, repo, branch, title, files, env.GH_TOKEN_DATA);
+  const prUrl = await writeFilesAsPR(env, branch, title, files, baseBranch);
 
   // 6) Antwort
   return json(200, {
@@ -598,14 +614,21 @@ export default {
         return ok(env, r.data);
       }
 
-      if (req.method === "POST" && m === url.pathname.match(/^\/api\/tenants\/([^/]+)\/init$/)) {
-        const orgId = m[1];
-        const payload = await req.json().catch(()=> ({}));
+      // POST /api/tenants  (einfaches Schreiben tenant.json in data/tenants/<orgId>)
+      if (request.method === "POST" && path === "/api/tenants") {
+        return handlePostTenant(request, env);
+      }
+
+      // POST /api/tenants/:orgId/init  (Branch + Dateien + PR)
+      m = path.match(/^\/api\/tenants\/([^/]+)\/init$/);
+      if (request.method === "POST" && m) {
+        const orgId = sanitizeId(m[1]);
+        const payload = await request.json().catch(() => ({}));
         return handleInitTenant(env, orgId, payload);
       }
 
-      const key = req.headers.get('x-api-key');
-      if (!key || key !== env.APP_API_KEY) return json(401, { error: 'unauthorized' });
+      const key = request.headers.get('x-api-key');
+      if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
 
       // POST SSP (PR to data repo)
       m = path.match(/^\/api\/ssp\/([^/]+)\/([^/]+)$/);
@@ -677,6 +700,8 @@ export default {
             "GET  /api/ssp/:org/:proc",
             "GET  /api/ssp-bundle/:org/:proc",
             "GET  /api/ropa/:org",
+            "POST /api/tenants",
+            "POST /api/tenants/:orgId/init",
             "POST /api/ssp/:org/:proc",
             "POST /api/evidence/verify"
           ],
