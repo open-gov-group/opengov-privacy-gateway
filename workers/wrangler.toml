@@ -2,6 +2,7 @@
 name = "opengov-privacy-api"
 main = "worker.mjs"
 compatibility_date = "2024-11-01"
+account_id = "ba2826d2487315d901dcf1078d091d48"
 
 # Optional: nur für lokales `wrangler dev` ohne --env 
 [vars]
@@ -13,6 +14,17 @@ DATA_BASE  = "main"
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
 JWT_ALG = "HS256"
+DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
+
+# Optional Indizes:
+# CATALOG_INDEX_URL = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/build/catalogs.index.json"
+# PROFILE_INDEX_URL = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/build/profiles.index.json"
+TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa_full.json"
+
+# Secrets (per wrangler secret):
+# - GH_TOKEN_DATA
+# - APP_API_KEY
+
 
 # ---- STAGING (Demo / Mock) ----
 [env.staging]
@@ -25,6 +37,8 @@ DATA_BASE  = "main"
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
 JWT_ALG = "HS256"
+DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
+TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
 
 # ---- PRODUCTION (echte Speicherung ins Data-Repo) ----
 [env.production]
@@ -38,6 +52,8 @@ DATA_BASE  = "main"
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
 JWT_ALG = "HS256"
+DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
+TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
 
 
 
