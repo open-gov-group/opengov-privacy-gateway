@@ -27,14 +27,14 @@ jobs:
 
       - name: Whoami (sanity)
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: wrangler whoami
 
       # (Optional) set ENV-scoped vars via Wrangler — if you prefer not to click the dashboard
       - name: Push env vars (staging) — optional
         if: ${{ false }} # set to true if you want to manage via CI
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           wrangler vars put MOCK_BASE --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
           wrangler vars put DATA_OWNER --env=staging --quiet --value "open-gov-group"
@@ -47,7 +47,7 @@ jobs:
       - name: Put secrets (staging) — optional
         if: ${{ false }} # set to true if you want to manage secrets via CI
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           printf '%s' '${{ secrets.APP_API_KEY }}' | wrangler secret put APP_API_KEY --env=staging --quiet
           printf '%s' '${{ secrets.JWT_SECRET }}'  | wrangler secret put JWT_SECRET  --env=staging --quiet
@@ -55,9 +55,9 @@ jobs:
 
       - name: Deploy (staging)
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: wrangler deploy --env=staging
 
       - name: Health check
         run: |
-          curl -i https://opengov-privacy-api-staging.${{ secrets.CF_ACCOUNT_TAG }}.workers.dev/api/healthz || true
+          curl -i https://opengov-privacy-api-staging.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev/api/healthz || true

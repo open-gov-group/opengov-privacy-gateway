@@ -30,30 +30,43 @@ TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-pr
 [env.staging]
 [env.staging.vars]
 MODE = "mock"
-MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main"
+
+# Mock catalog/ssp bundle source for read-only endpoints
+MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
 DATA_OWNER = "open-gov-group"
 DATA_REPO  = "opengov-privacy-data"
-DATA_BASE  = "main"
+DATA_BASE  = "https://api.github.com"
+
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
 JWT_ALG = "HS256"
-DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
-TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+
+# Defaults for UI convenience (both can be changed per-request)
+  DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
+  TEMPLATE_SSP_HREF    = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+
 
 # ---- PRODUCTION (echte Speicherung ins Data-Repo) ----
 [env.production]
 [env.production.vars]
 MODE = "prod"
+
 # In prod meist kein MOCK_BASE notwendig; falls verwendet, gern eigene Release-URL
-MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main"
+# Mock catalog/ssp bundle source for read-only endpoints
+MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
 DATA_OWNER = "open-gov-group"
 DATA_REPO  = "opengov-privacy-data"
-DATA_BASE  = "main"
+DATA_BASE  = "https://api.github.com"
+
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
 JWT_ALG = "HS256"
-DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
-TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+
+# Defaults for UI convenience (both can be changed per-request)
+  DEFAULT_PROFILE_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/profiles/profile_intervenability.json"
+  TEMPLATE_SSP_HREF    = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+
+
 
 
 
