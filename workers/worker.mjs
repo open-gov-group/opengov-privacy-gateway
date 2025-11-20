@@ -185,6 +185,43 @@ async function listProfiles(env) {
   ];
 }
 
+// --- Helfer: sicheres Lesen von ENV, ohne auf nicht gesetzte Felder zuzugreifen
+function has(v) {
+  return v !== undefined && v !== null && String(v).trim() !== '';
+}
+
+// --- Healthz: KEINE Account-ID nötig, KEINE Auth nötig
+async function handleHealthz(env) {
+  // Nur minimal prüfen, was wir wirklich brauchen
+  const checks = {
+    mode: String(env.MODE || 'unset'),
+    envVars: {
+      MOCK_BASE: has(env.MOCK_BASE),
+      DATA_OWNER: has(env.DATA_OWNER),
+      DATA_REPO: has(env.DATA_REPO),
+      DATA_BASE: has(env.DATA_BASE),
+      DEFAULT_PROFILE_HREF: has(env.DEFAULT_PROFILE_HREF),
+      TEMPLATE_SSP_HREF: has(env.TEMPLATE_SSP_HREF),
+    },
+    // Secrets nicht loggen — nur „gesetzt / nicht gesetzt“
+    secrets: {
+      APP_API_KEY: has(env.APP_API_KEY),
+      GH_TOKEN_DATA: has(env.GH_TOKEN_DATA),
+      JWT_SECRET: has(env.JWT_SECRET),
+    }
+  };
+
+  // CORS-Header wie bei dir üblich
+  const headers = makeCors(env);
+  headers['cache-control'] = 'no-store';
+
+  return new Response(JSON.stringify({ ok: true, checks }, null, 2), {
+    status: 200,
+    headers
+  });
+}
+
+
 async function resolveProfile(env, href) {
   // Aktuell: pass-through (wir liefern das referenzierte JSON). Später: echtes "resolve" (include/alter anwenden)
   if (!href) return { ok: false, status: 400, data: { error: "missing href" } };
@@ -200,6 +237,8 @@ async function buildSSPTemplate(env, profileHref) {
   candidates.push(
     "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
   );
+
+
 
   // Versuche nacheinander zu laden
   for (const href of candidates) {
@@ -572,7 +611,11 @@ export default {
       const path = url.pathname;
 
       // basic
-      if (path === "/healthz") return ok(env, { ok: true, ts: new Date().toISOString(), service: "open-privacy-api" });
+      //if (path === "/healthz") return ok(env, { ok: true, ts: new Date().toISOString(), service: "open-privacy-api" });
+      // In deinem Router:
+      if (request.method === 'GET' && (url.pathname === '/api/healthz' || url.pathname === '/healthz')) {
+        return handleHealthz(env);
+      }
       if (path === "/mode")   return ok(env, { mode: env.MODE || "mock" });
 
       // catalogs
