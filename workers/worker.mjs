@@ -521,7 +521,7 @@ async function handleInitTenant(env, orgId, payload) {
   const prUrl = await writeFilesAsPR(env, branch, title, files, baseBranch);
 
   // 6) Antwort
-  return json(200, {
+  return json(env, 200, {
     ok: true,
     orgId,
     created: { prUrl, branch },
@@ -616,12 +616,16 @@ export default {
 
       // POST /api/tenants  (einfaches Schreiben tenant.json in data/tenants/<orgId>)
       if (request.method === "POST" && path === "/api/tenants") {
+        const key = request.headers.get('x-api-key');
+        if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
         return handlePostTenant(request, env);
       }
 
       // POST /api/tenants/:orgId/init  (Branch + Dateien + PR)
       m = path.match(/^\/api\/tenants\/([^/]+)\/init$/);
-      if (request.method === "POST" && m) {
+       if (request.method === "POST" && m) {
+        const key = request.headers.get('x-api-key');
+        if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });        
         const orgId = sanitizeId(m[1]);
         const payload = await request.json().catch(() => ({}));
         return handleInitTenant(env, orgId, payload);
@@ -633,6 +637,8 @@ export default {
       // POST SSP (PR to data repo)
       m = path.match(/^\/api\/ssp\/([^/]+)\/([^/]+)$/);
       if (request.method === "POST" && m) {
+        const key = request.headers.get('x-api-key');
+        if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
         const gate = await requireJWT(request, env);
         if (!gate.ok) return unauthorized(env, gate.error);
         if (!env.GH_TOKEN_DATA) return serverErr(env, "GH_TOKEN_DATA not configured");
