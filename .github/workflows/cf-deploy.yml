@@ -42,7 +42,7 @@ jobs:
           wrangler vars put MOCK_BASE --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
           wrangler vars put DATA_OWNER --env=staging --quiet --value "open-gov-group"
           wrangler vars put DATA_REPO  --env=staging --quiet --value "opengov-privacy-data"
-          wrangler vars put DATA_BASE  --env=staging --quiet --value "https://api.github.com"
+          wrangler vars put DATA_BASE  --env=staging --quiet --value "main"
           wrangler vars put JWT_ISS    --env=staging --quiet --value "opengov-privacy-app"
           wrangler vars put JWT_AUD    --env=staging --quiet --value "opengov-privacy-api"
           wrangler vars put JWT_ALG    --env=staging --quiet --value "HS256"
