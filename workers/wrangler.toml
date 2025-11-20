@@ -3,6 +3,8 @@ name = "opengov-privacy-api"
 main = "worker.mjs"
 compatibility_date = "2024-11-01"
 account_id = "ba2826d2487315d901dcf1078d091d48"
+workers_dev = true
+preview_urls = false
 
 # Optional: nur für lokales `wrangler dev` ohne --env 
 [vars]
@@ -29,7 +31,8 @@ TEMPLATE_SSP_HREF = "https://raw.githubusercontent.com/open-gov-group/opengov-pr
 # ---- STAGING (Demo / Mock) ----
 [env.staging]
 [env.staging.vars]
-MODE = "mock"
+#MODE = "mock"
+MODE = "mock-no-auth"
 
 # Mock catalog/ssp bundle source for read-only endpoints
 MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"

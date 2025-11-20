@@ -56,6 +56,21 @@ const unauthorized = (env, msg = "unauthorized") =>
 const serverErr = (env, msg) =>
   new Response(JSON.stringify({ error: "server_error", detail: msg }), { status: 500, headers: makeCors(env) });
 
+function isNoAuthMode(env) {
+  return String(env.MODE || '').toLowerCase() === 'mock-no-auth';
+}
+
+// Beispiel in deinem Router-Handler VOR den Endpunkten:
+async function requireApiKey(request, env) {
+  if (isNoAuthMode(env)) return { ok: true };     // <— Auth übersprungen
+  const key = request.headers.get('x-api-key');
+  if (!key || key !== env.APP_API_KEY) {
+    return { ok: false, res: json({ error: 'unauthorized' }, 401) };
+  }
+  return { ok: true };
+}
+
+
 function makeCors(env) {
   const h = { ...JSON_HEADERS_BASE };
   h["access-control-allow-origin"] = env.ALLOW_ORIGIN || "*";
@@ -459,11 +474,19 @@ async function verifyJwtHS256(token, secret, { iss, aud } = {}) {
   }
 }
 
+//async function requireJWT(request, env) {
+// const auth = request.headers.get("authorization") || "";
+//  if (!auth.startsWith("Bearer ")) return { ok: false, error: "missing bearer token" };
+//  const token = auth.slice(7).trim();
+//  if (!env.APP_API_KEY) return { ok: false, error: "APP_API_KEY missing" };
+//  const iss = env.JWT_ISS || "open-privacy";
+//  const aud = env.JWT_AUD || "open-privacy-api";
+//  const res = await verifyJwtHS256(token, env.APP_API_KEY, { iss, aud });
+//  return res;
+//}
+
 async function requireJWT(request, env) {
-  const auth = request.headers.get("authorization") || "";
-  if (!auth.startsWith("Bearer ")) return { ok: false, error: "missing bearer token" };
-  const token = auth.slice(7).trim();
-  if (!env.APP_API_KEY) return { ok: false, error: "APP_API_KEY missing" };
+  if (isNoAuthMode(env)) return { ok: true };     // <— Auth übersprungen
   const iss = env.JWT_ISS || "open-privacy";
   const aud = env.JWT_AUD || "open-privacy-api";
   const res = await verifyJwtHS256(token, env.APP_API_KEY, { iss, aud });
@@ -616,16 +639,18 @@ export default {
 
       // POST /api/tenants  (einfaches Schreiben tenant.json in data/tenants/<orgId>)
       if (request.method === "POST" && path === "/api/tenants") {
-        const key = request.headers.get('x-api-key');
-        if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
+        //const key = request.headers.get('x-api-key');
+        //if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
+        requireApiKey(request, env) 
         return handlePostTenant(request, env);
       }
 
       // POST /api/tenants/:orgId/init  (Branch + Dateien + PR)
       m = path.match(/^\/api\/tenants\/([^/]+)\/init$/);
        if (request.method === "POST" && m) {
-        const key = request.headers.get('x-api-key');
-        if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });        
+        //const key = request.headers.get('x-api-key');
+        //if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
+        requireApiKey(request, env)         
         const orgId = sanitizeId(m[1]);
         const payload = await request.json().catch(() => ({}));
         return handleInitTenant(env, orgId, payload);
