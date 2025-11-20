@@ -60,15 +60,18 @@ function isNoAuthMode(env) {
   return String(env.MODE || '').toLowerCase() === 'mock-no-auth';
 }
 
-// Beispiel in deinem Router-Handler VOR den Endpunkten:
+
 async function requireApiKey(request, env) {
-  if (isNoAuthMode(env)) return { ok: true };     // <— Auth übersprungen
+  // allow everything in mock-no-auth
+  if (isNoAuthMode(env)) return { ok: true };
+
   const key = request.headers.get('x-api-key');
   if (!key || key !== env.APP_API_KEY) {
-    return { ok: false, res: json({ error: 'unauthorized' }, 401) };
+    return { ok: false, response: unauthorized(env, 'bad or missing x-api-key') };
   }
   return { ok: true };
 }
+
 
 
 function makeCors(env) {
@@ -474,24 +477,18 @@ async function verifyJwtHS256(token, secret, { iss, aud } = {}) {
   }
 }
 
-//async function requireJWT(request, env) {
-// const auth = request.headers.get("authorization") || "";
-//  if (!auth.startsWith("Bearer ")) return { ok: false, error: "missing bearer token" };
-//  const token = auth.slice(7).trim();
-//  if (!env.APP_API_KEY) return { ok: false, error: "APP_API_KEY missing" };
-//  const iss = env.JWT_ISS || "open-privacy";
-//  const aud = env.JWT_AUD || "open-privacy-api";
-//  const res = await verifyJwtHS256(token, env.APP_API_KEY, { iss, aud });
-//  return res;
-//}
-
 async function requireJWT(request, env) {
+ const auth = request.headers.get("authorization") || "";
+  //if (!auth.startsWith("Bearer ")) return { ok: false, error: "missing bearer token" };
   if (isNoAuthMode(env)) return { ok: true };     // <— Auth übersprungen
+  const token = auth.slice(7).trim();
+  if (!env.APP_API_KEY) return { ok: false, error: "APP_API_KEY missing" };
   const iss = env.JWT_ISS || "open-privacy";
   const aud = env.JWT_AUD || "open-privacy-api";
   const res = await verifyJwtHS256(token, env.APP_API_KEY, { iss, aud });
   return res;
 }
+
 
 // Optional: simple SHA-256
 async function sha256Hex(buf) {
@@ -562,10 +559,15 @@ export default {
   async fetch(request, env) {
     try {
       // CORS preflight
+      //if (request.method === "OPTIONS") {
+      //  return new Response(null, { status: 204, headers: makeCors(env) });
+      //}
       if (request.method === "OPTIONS") {
-        return new Response(null, { status: 204, headers: makeCors(env) });
+        const h = makeCors(env);
+        h['access-control-allow-methods'] = 'GET,POST,OPTIONS';
+        h['access-control-allow-headers'] = request.headers.get('access-control-request-headers') || 'content-type,authorization,x-api-key';
+        return new Response(null, { status: 204, headers: h });
       }
-
       const url = new URL(request.url);
       const path = url.pathname;
 
@@ -641,7 +643,8 @@ export default {
       if (request.method === "POST" && path === "/api/tenants") {
         //const key = request.headers.get('x-api-key');
         //if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
-        requireApiKey(request, env) 
+          const gate = await requireApiKey(request, env);
+          if (!gate.ok) return gate.response;
         return handlePostTenant(request, env);
       }
 
@@ -650,42 +653,43 @@ export default {
        if (request.method === "POST" && m) {
         //const key = request.headers.get('x-api-key');
         //if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
-        requireApiKey(request, env)         
-        const orgId = sanitizeId(m[1]);
-        const payload = await request.json().catch(() => ({}));
+          const gate = await requireApiKey(request, env);
+          if (!gate.ok) return gate.response;       
+          const orgId = sanitizeId(m[1]);
+          const payload = await request.json().catch(() => ({}));
         return handleInitTenant(env, orgId, payload);
       }
-
-      const key = request.headers.get('x-api-key');
-      if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
 
       // POST SSP (PR to data repo)
       m = path.match(/^\/api\/ssp\/([^/]+)\/([^/]+)$/);
       if (request.method === "POST" && m) {
-        const key = request.headers.get('x-api-key');
-        if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
-        const gate = await requireJWT(request, env);
-        if (!gate.ok) return unauthorized(env, gate.error);
-        if (!env.GH_TOKEN_DATA) return serverErr(env, "GH_TOKEN_DATA not configured");
+        //const key = request.headers.get('x-api-key');
+        //if (!key || key !== env.APP_API_KEY) return json(env, 401, { error: 'unauthorized' });
+          const gate = await requireApiKey(request, env);
+          if (!gate.ok) return gate.response;      
 
-        const [_, org, proc] = m;
-        let body;
-        try { body = await request.json(); } catch { return badReq(env, "Body must be valid JSON"); }
-        if (!body?.["system-security-plan"]) return badReq(env, "Missing 'system-security-plan' root");
+        //const gate = await requireJWT(request, env);
+        //if (!gate.ok) return unauthorized(env, gate.error);
+        //if (!env.GH_TOKEN_DATA) return serverErr(env, "GH_TOKEN_DATA not configured");
 
-        const branch = `update/${sanitizeId(org)}-${sanitizeId(proc)}-${nowStamp()}`;
-        const okBranch = await ensureBranch(env, env.DATA_BASE || "main", branch);
-        if (!okBranch) return serverErr(env, "Failed to create branch");
+          const [_, org, proc] = m;
+          let body;
+          try { body = await request.json(); } catch { return badReq(env, "Body must be valid JSON"); }
+          if (!body?.["system-security-plan"]) return badReq(env, "Missing 'system-security-plan' root");
 
-        const pathInRepo = `tenants/${sanitizeId(org)}/procedures/${sanitizeId(proc)}/ssp.json`;
-        const msg = `chore(ssp): update ${org}/${proc} via API`;
-        const put = await putFile(env, branch, pathInRepo, body, msg);
-        if (!put) return serverErr(env, "Failed to write file");
+          const branch = `update/${sanitizeId(org)}-${sanitizeId(proc)}-${nowStamp()}`;
+          const okBranch = await ensureBranch(env, env.DATA_BASE || "main", branch);
+          if (!okBranch) return serverErr(env, "Failed to create branch");
 
-        const title = `Update SSP: ${org}/${proc}`;
-        const prBody = `Automated update via API (${new Date().toISOString()})`;
-        const pr = await openPR(env, branch, title, prBody, env.DATA_BASE || "main");
-        if (!pr) return serverErr(env, "Failed to open PR");
+          const pathInRepo = `tenants/${sanitizeId(org)}/procedures/${sanitizeId(proc)}/ssp.json`;
+          const msg = `chore(ssp): update ${org}/${proc} via API`;
+          const put = await putFile(env, branch, pathInRepo, body, msg);
+          if (!put) return serverErr(env, "Failed to write file");
+
+          const title = `Update SSP: ${org}/${proc}`;
+          const prBody = `Automated update via API (${new Date().toISOString()})`;
+          const pr = await openPR(env, branch, title, prBody, env.DATA_BASE || "main");
+          if (!pr) return serverErr(env, "Failed to open PR");
 
         return ok(env, { ok: true, pr_url: pr.html_url, branch, path: pathInRepo });
       }

@@ -14,6 +14,8 @@ jobs:
     defaults:
       run:
         working-directory: workers   # <— adjust if your wrangler.toml is under /gateway
+
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +26,15 @@ jobs:
 
       - name: Install Wrangler
         run: npm i -g wrangler@4
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          workingDirectory: workers
+          wranglerVersion: 4.47.0
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: whoami
+
 
       - name: Whoami (sanity)
         env:
