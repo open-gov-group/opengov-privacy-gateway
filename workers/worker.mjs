@@ -538,9 +538,9 @@ async function sha256Hex(buf) {
 
 async function handleInitTenant(env, orgId, payload) {
   // 1) einfache Validierung
-  if (!/^[a-z0-9-]{2,64}$/.test(orgId)) {
-    return json(env, 400, { error: 'invalid_orgId' });
-  }
+  //if (!/^[a-z0-9-]{2,64}$/.test(orgId)) {
+  //  return json(env, 400, { error: 'invalid_orgId' });
+  //}
 
   const orgName = (payload?.orgName || '').trim();
   const defaultProfileHref = (payload?.defaultProfileHref || '').trim();
