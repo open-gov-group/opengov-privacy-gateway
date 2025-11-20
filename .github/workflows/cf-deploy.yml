@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: gateway   # <— adjust if your wrangler.toml is under /gateway
+        working-directory: workers   # <— adjust if your wrangler.toml is under /gateway
     steps:
       - uses: actions/checkout@v4
 
