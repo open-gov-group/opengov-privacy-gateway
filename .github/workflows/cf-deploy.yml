@@ -27,14 +27,11 @@ jobs:
       - name: Install Wrangler
         run: npm i -g wrangler@4
 
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          workingDirectory: workers
-          wranglerVersion: 4.47.0
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: whoami
-
+      - name: Whoami (sanity)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler whoami
 
       # (Optional) set ENV-scoped vars via Wrangler — if you prefer not to click the dashboard
       - name: Push env vars (staging) — optional
