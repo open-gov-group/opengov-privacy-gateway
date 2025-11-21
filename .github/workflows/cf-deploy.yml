@@ -11,56 +11,49 @@ on:
 jobs:
   deploy-staging:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: workers   # <— adjust if your wrangler.toml is under /gateway
 
+    env:
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Aliase nur für Lesbarkeit – keine gleichen Namen wie Secrets benutzen!
+      STAGING_APP_API_KEY: ${{ secrets.STAGING_APP_API_KEY }}
+      STAGING_GH_TOKEN_DATA: ${{ secrets.STAGING_GH_TOKEN_DATA }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node 20 (optional for local build steps)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Install Wrangler
         run: npm i -g wrangler@4
 
-      - name: Whoami (sanity)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: wrangler whoami
-
-      # (Optional) set ENV-scoped vars via Wrangler — if you prefer not to click the dashboard
-      - name: Push env vars (staging) — optional
-        if: ${{ false }} # set to true if you want to manage via CI
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # --- Secrets zuerst setzen (per stdin) ---
+      - name: Put secret GH_TOKEN_DATA (staging)
         run: |
-          wrangler vars put MOCK_BASE --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
-          wrangler vars put DATA_OWNER --env=staging --quiet --value "open-gov-group"
-          wrangler vars put DATA_REPO  --env=staging --quiet --value "opengov-privacy-data"
-          wrangler vars put DATA_BASE  --env=staging --quiet --value "main"
-          wrangler vars put JWT_ISS    --env=staging --quiet --value "opengov-privacy-app"
-          wrangler vars put JWT_AUD    --env=staging --quiet --value "opengov-privacy-api"
-          wrangler vars put JWT_ALG    --env=staging --quiet --value "HS256"
+          printf '%s' "${STAGING_GH_TOKEN_DATA}" | \
+          wrangler secret put GH_TOKEN_DATA --env=staging --quiet
 
-      - name: Put secrets (staging) — optional
-        if: ${{ false }} # set to true if you want to manage secrets via CI
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Put secret APP_API_KEY (staging)
         run: |
-          printf '%s' '${{ secrets.APP_API_KEY }}' | wrangler secret put APP_API_KEY --env=staging --quiet
-          printf '%s' '${{ secrets.JWT_SECRET }}'  | wrangler secret put JWT_SECRET  --env=staging --quiet
-          printf '%s' '${{ secrets.GH_TOKEN_DATA }}' | wrangler secret put GH_TOKEN_DATA --env=staging --quiet
+          printf '%s' "${STAGING_APP_API_KEY}" | \
+          wrangler secret put APP_API_KEY --env=staging --quiet
+
+      # --- dann Vars (nicht-sensibel) ---
+      - name: Put vars (staging)
+        run: |
+          # WICHTIG: DATA_BASE ist ein BRANCH-NAME, keine URL!
+          wrangler vars put MODE                --env=staging --quiet --value "mock" 
+          wrangler vars put DATA_OWNER          --env=staging --quiet --value "open-gov-group"
+          wrangler vars put DATA_REPO           --env=staging --quiet --value "opengov-privacy-data"
+          wrangler vars put DATA_BASE           --env=staging --quiet --value "main"
+          wrangler vars put DEFAULT_PROFILE_HREF --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/build/profile_resolved_catalog.json"
+          wrangler vars put TEMPLATE_SSP_HREF    --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+
+          # Optional: JWT-Anwendungsmetadaten (öffentlich, daher vars)
+          wrangler vars put JWT_ISS --env=staging --quiet --value "open-privacy-api"
+          wrangler vars put JWT_AUD --env=staging --quiet --value "opengov-privacy-ui"
+          wrangler vars put JWT_ALG --env=staging --quiet --value "HS256"
 
       - name: Deploy (staging)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: wrangler deploy --env=staging
 
-      - name: Health check
-        run: |
-          curl -i https://opengov-privacy-api-staging.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev/api/healthz || true
+      - name: Healthcheck
+        run: curl -fsSL https://opengov-privacy-api-staging.opengov-group.workers.dev/api/healthz
