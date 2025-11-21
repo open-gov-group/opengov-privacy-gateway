@@ -221,7 +221,7 @@ export async function initTenant(env, orgId, /** @type {TenantInitPayload} */ pa
 
   const branch = `init/${id}-${nowStamp()}`;
   const okBr = await ensureBranch(env, env.DATA_BASE || "main", branch);
-  if (!okBr) return { ok:false, error:"branch_failed - "+ "env: "+ env.DATA_REPO + " base: " + env.DATA_BASE + "branch: " + branch};
+  if (!okBr) return { ok:false, error:"branch_failed - "+ "env: "+ env.DATA_REPO + " base: " + env.DATA_BASE + " branch: " + branch};
 
   const files = [
     { path: p.meta, content: meta },

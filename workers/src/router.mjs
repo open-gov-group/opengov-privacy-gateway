@@ -45,9 +45,9 @@ export async function route(request, env, ctx) {
           TEMPLATE_SSP_HREF: !!env.TEMPLATE_SSP_HREF
         },
         secrets: {
-          APP_API_KEY: !!env.APP_API_KEY,
-          GH_TOKEN_DATA: !!env.GH_TOKEN_DATA,
-          JWT_SECRET: !!env.JWT_SECRET
+          APP_API_KEY: env.APP_API_KEY,
+          GH_TOKEN_DATA: env.GH_TOKEN_DATA,
+          JWT_SECRET: env.JWT_SECRET
         }
       }
     });
