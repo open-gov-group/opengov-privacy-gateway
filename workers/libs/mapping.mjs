@@ -8,8 +8,7 @@ export async function parseXdomeaToRopa(sourceText, contentType = 'application/x
     const j = JSON.parse(sourceText);
     const nodes = (j.root?.children ?? []).filter(n => n.tag === 'xdomea:Aktenplan');
     for (const n of nodes) {
-      const label = (n.value?.children ?? [])
-        .find(c => c.tag === 'xdomea:Bezeichnung')?.value?.['#text'];
+      const label = (n.value?.children ?? []).find(c => c.tag === 'xdomea:Bezeichnung')?.value?.['#text'];
       if (label) {
         const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         processes.push({ id, title: label });
@@ -18,6 +17,7 @@ export async function parseXdomeaToRopa(sourceText, contentType = 'application/x
     return { processes };
   }
 
+  // XML-Fall (vereinfachtes MVP)
   const bezeichnungen = [...sourceText.matchAll(/<xdomea:Bezeichnung>([^<]+)<\/xdomea:Bezeichnung>/g)]
     .map(m => m[1]);
 
@@ -28,18 +28,13 @@ export async function parseXdomeaToRopa(sourceText, contentType = 'application/x
 
   return { processes };
 }
-/**
- * Ingest xDOMEA source (url | xml | json) and normalize to:
- *   { ok: true, items: [{ id, title }] }
- *
- * payload: { url?: string, xml?: string, json?: object|string }
- */
+
 export async function ingestXdomea(env, payload = {}) {
   try {
-    let sourceText;
+    let sourceText = null;
     let contentType = 'application/xml';
 
-    // 1) Quelle bestimmen
+    // 1) Quelle bestimmen – OHNE "files"
     if (payload.xml) {
       sourceText = String(payload.xml);
       contentType = 'application/xml';
@@ -63,10 +58,16 @@ export async function ingestXdomea(env, payload = {}) {
       contentType = resp.headers.get('content-type') || 'application/octet-stream';
       sourceText = await resp.text();
     } else {
+      // WENN du später "files" wieder einführst, wäre hier der Platz,
+      // aber nicht default.
       return { ok: false, error: 'missing_source' };
     }
 
-    // 2) In RoPA-Prozesse übersetzen (nutzt euren bestehenden Parser)
+    if (!sourceText) {
+      return { ok: false, error: 'empty_source' };
+    }
+
+    // 2) XDOMEA -> RoPA-Prozesse
     const { processes } = await parseXdomeaToRopa(sourceText, contentType);
 
     const items = (processes || []).map(p => ({

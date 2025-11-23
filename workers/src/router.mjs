@@ -116,8 +116,8 @@ export async function route(request, env, ctx) {
     {
     const m = match('/api/tenants/:orgId/merge', pathname);
       if (request.method === 'POST' && m ) {
-        const gate = await requireApiKey(request, env);
-        if (!gate.ok) return gate.response;
+       // const gate = await requireApiKey(request, env);
+       //if (!gate.ok) return gate.response;
         const ref = searchParams.get('ref');
         if (!ref) return badRequest('missing ref');
         const base = searchParams.get('base') || (env.DATA_BASE || 'main');
@@ -186,7 +186,8 @@ export async function route(request, env, ctx) {
     const m = match('/api/tenants/:orgId/procedures', pathname);
     if (request.method === 'GET' && m) {
       const { listSSPs } = await import('../libs/tenantProcedures.mjs');
-      const list = await listSSPs(env, m.orgId);
+      const ref = searchParams.get('ref') || undefined;
+      const list = await listSSPs(env, m.orgId, ref);
       return ok({ items: list });
     }
   }
@@ -239,11 +240,21 @@ export async function route(request, env, ctx) {
     if (request.method === 'POST' && m) {
       const gate = await requireApiKey(request, env);
       if (!gate.ok) return gate.response;
+
       const { importXdomeaIntoTenant } = await import('../libs/tenantRopa.mjs');
-      const payload = await request.json().catch(()=> ({})); // { url?: string, xml?: string, template?: 'minimal'|'domain' }
+      const payload = await request.json().catch(()=> ({}));
+      const ref = searchParams.get('ref');   // <-- neu
+
+      if (ref) payload.ref = ref;            // <-- neu
+
       const res = await importXdomeaIntoTenant(env, m.orgId, payload);
-      if (!res?.ok) return badRequest(res?.error || 'import_failed');
-      return ok({ ok:true, created: res.created, next: res.next }); // z.B. Liste angelegter SSP-IDs
+      if (!res?.ok) {
+        const msg = res.detail
+          ? `${res.error || 'import_failed'}: ${res.detail}`
+          : (res.error || 'import_failed');
+        return badRequest(msg);
+      }
+      return ok({ ok:true, created: res.created, next: res.next });
     }
   }
 

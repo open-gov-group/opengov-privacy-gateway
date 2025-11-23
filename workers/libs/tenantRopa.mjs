@@ -2,7 +2,8 @@
 
 import { ingestXdomea } from './mapping.mjs';
 import { buildMinimalSSP } from './oscal.mjs';
-import { putTenantBundle } from './tenantProcedures.mjs';
+import { putTenantBundle, ghReadJson } from './tenantProcedures.mjs';
+import { ensureBranch, putJsonFile } from './tenant.mjs';
 
 const RAW = (owner, repo, branch, path) =>
   `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
@@ -90,8 +91,25 @@ const ropaPath = (orgId, processId) =>
   `data/tenants/${orgId}/ropa/${processId}.json`;
 
 export async function listProcesses(env, orgId) {
-  return await ghList(env, `data/tenants/${orgId}/ropa`);
+  const path = `data/tenants/${orgId}/ropa/ropa.json`;
+  const res = await ghReadJson(env, path);  // sollte ref = DATA_BASE verwenden
+  if (!res?.ok) {
+    return []; // kein ropa.json → leeres Verzeichnis
+  }
+
+  const data = res.data || {};
+  if (Array.isArray(data.processes)) {
+    return data.processes;
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return [];
 }
+
+
+
+
 export async function readProcess(env, orgId, processId) {
   return await ghReadJson(env, ropaPath(orgId, processId));
 }
@@ -108,8 +126,9 @@ export async function writeProcess(env, orgId, processId, doc) {
   return { ok:true, branch, prUrl };
 }
 
+// in workers/libs/tenantRopa.mjs
+
 export async function importXdomeaIntoTenant(env, orgId, payload = {}) {
-  // payload: { url?: string, xml?: string, json?: object, template?: 'minimal'|'process', profileHref?: string }
   const res = await ingestXdomea(env, payload);
   if (!res?.ok) return { ok:false, error: res?.error || 'ingest_failed' };
 
@@ -118,19 +137,67 @@ export async function importXdomeaIntoTenant(env, orgId, payload = {}) {
     const title = proc.title || proc.id;
     const profileHref = payload.profileHref || env.DEFAULT_PROFILE_HREF || undefined;
 
-    // minimal SSP per process
     const ssp = buildMinimalSSP({ title, profileHref });
 
-    // store under bundles (one bundle per process)
     const bundleId = `bundle-${proc.id}`;
-    const put = await putTenantBundle(env, orgId, bundleId, {
-      title,
-      slug: proc.id,
-      profileHref,
-      ssp
+    const refBranch = payload.ref && payload.ref.trim();
+
+    const put = await putTenantBundle(
+      env,
+      orgId,
+      bundleId,
+      { title, slug: proc.id, profileHref, ssp },
+      { ref: refBranch }  // <--- hier
+    );
+
+    // HIER ändern:
+    if (!put?.ok) {
+      return {
+        ok: false,
+        error: put.error || 'write_failed',
+        detail: put.detail || proc.id
+      };
+    }
+
+    created.push({
+      processId: proc.id,
+      sspHref: put.sspHref,
+      prUrl: put.prUrl || null
     });
-    if (!put?.ok) return { ok:false, error:'write_failed', detail: proc.id };
-    created.push({ processId: proc.id, sspHref: put.sspHref, prUrl: put.prUrl || null });
+  }
+  const refBranch = (payload.ref && payload.ref.trim()) || null;
+  if (refBranch) {
+    const base = env.DATA_BASE || 'main';
+    const mk = await ensureBranch(env, base, refBranch);
+    if (!mk?.ok) {
+      return {
+        ok: false,
+        error: 'write_failed',
+        detail: mk.error || 'ensure_branch_failed'
+      };
+    }
+    const branch = mk.branch || refBranch;
+
+    // ROPA-Dokument aufbauen
+    const processMap = new Map(res.items.map(p => [p.id, p]));
+    const ropaDoc = {
+      orgId,
+      updatedAt: new Date().toISOString(),
+      processes: created.map(c => {
+        const p = processMap.get(c.processId) || { id: c.processId, title: c.processId };
+        return {
+          id: c.processId,
+          title: p.title || c.processId,
+          sspHref: c.sspHref
+        };
+      })
+    };
+
+    const path = `data/tenants/${orgId}/ropa/ropa.json`;
+    const put = await putJsonFile(env, branch, path, ropaDoc, `feat(ropa): update ${orgId}/ropa`);
+    if (!put.ok) {
+      return { ok:false, error:'write_failed', detail: put.error || 'write_ropa_failed' };
+    }
   }
 
   return {
@@ -141,4 +208,6 @@ export async function importXdomeaIntoTenant(env, orgId, payload = {}) {
       proceduresHref: `/api/tenants/${encodeURIComponent(orgId)}/procedures`
     }
   };
+
 }
+

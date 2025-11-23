@@ -84,7 +84,7 @@ async function getBaseRef(env, owner, repo, base) {
   return r;
 }
 
-async function ensureBranch(env, baseRaw, newBranchRaw) {
+export async function ensureBranch(env, baseRaw, newBranchRaw) {
   const owner = env.DATA_OWNER;
   const repo  = env.DATA_REPO;
   const base  = normalizeBaseBranch(env);
