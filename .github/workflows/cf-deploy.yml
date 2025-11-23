@@ -29,23 +29,23 @@ jobs:
         run: npm i -g wrangler@4
 
       # -------- SECRETS (sensitive) --------
-      - name: Secret: GH_TOKEN_DATA (staging)
+      - name: GH_TOKEN_DATA (staging)
         run: |
           echo -n "${{ secrets.STAGING_GH_TOKEN_DATA }}" | \
           wrangler secret put GH_TOKEN_DATA --env=staging
 
-      - name: Secret: APP_API_KEY (staging)
+      - name: APP_API_KEY (staging)
         run: |
           echo -n "${{ secrets.STAGING_APP_API_KEY }}" | \
           wrangler secret put APP_API_KEY --env=staging
 
-      - name: Secret: JWT_SECRET (staging)
+      - name: JWT_SECRET (staging)
         run: |
           echo -n "${{ secrets.STAGING_JWT_SECRET }}" | \
           wrangler secret put JWT_SECRET --env=staging
 
       # -------- VARS (non-sensitive) --------
-      - name: Vars: staging
+      - name: staging
         run: |
           # IMPORTANT: DATA_BASE is a BRANCH, not a URL
           wrangler vars put MODE                --env=staging --value "mock-no-auth"
