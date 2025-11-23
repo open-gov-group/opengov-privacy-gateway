@@ -1,5 +1,9 @@
 // workers/libs/tenantRopa.mjs
 
+import { ingestXdomea } from './mapping.mjs';
+import { buildMinimalSSP } from './oscal.mjs';
+import { putTenantBundle } from './tenantProcedures.mjs';
+
 const RAW = (owner, repo, branch, path) =>
   `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
 const API_CONTENTS = (owner, repo, path) =>
@@ -102,4 +106,39 @@ export async function writeProcess(env, orgId, processId, doc) {
 
   const prUrl = await ghOpenPr(env, branch, `[RoPA] ${orgId}/${processId}`);
   return { ok:true, branch, prUrl };
+}
+
+export async function importXdomeaIntoTenant(env, orgId, payload = {}) {
+  // payload: { url?: string, xml?: string, json?: object, template?: 'minimal'|'process', profileHref?: string }
+  const res = await ingestXdomea(env, payload);
+  if (!res?.ok) return { ok:false, error: res?.error || 'ingest_failed' };
+
+  const created = [];
+  for (const proc of res.items) {
+    const title = proc.title || proc.id;
+    const profileHref = payload.profileHref || env.DEFAULT_PROFILE_HREF || undefined;
+
+    // minimal SSP per process
+    const ssp = buildMinimalSSP({ title, profileHref });
+
+    // store under bundles (one bundle per process)
+    const bundleId = `bundle-${proc.id}`;
+    const put = await putTenantBundle(env, orgId, bundleId, {
+      title,
+      slug: proc.id,
+      profileHref,
+      ssp
+    });
+    if (!put?.ok) return { ok:false, error:'write_failed', detail: proc.id };
+    created.push({ processId: proc.id, sspHref: put.sspHref, prUrl: put.prUrl || null });
+  }
+
+  return {
+    ok: true,
+    created,
+    next: {
+      ropaHref: `/api/tenants/${encodeURIComponent(orgId)}/ropa`,
+      proceduresHref: `/api/tenants/${encodeURIComponent(orgId)}/procedures`
+    }
+  };
 }

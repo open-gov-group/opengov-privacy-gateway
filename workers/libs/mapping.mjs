@@ -1,3 +1,85 @@
 // workers/libs/mapping.mjs
-export async function resolveProfile(env, profileHref) { return { ok:false, status:501 }; }
-export async function mapXdomeaToSSP(env, xdomeaJson, rulesYamlHref) { return { ok:false, status:501 }; }
+
+// We reuse the simple parser already written in handlers/ropa.mjs
+export async function parseXdomeaToRopa(sourceText, contentType = 'application/xml') {
+  const processes = [];
+
+  if (contentType.includes('json') || sourceText.trim().startsWith('{')) {
+    const j = JSON.parse(sourceText);
+    const nodes = (j.root?.children ?? []).filter(n => n.tag === 'xdomea:Aktenplan');
+    for (const n of nodes) {
+      const label = (n.value?.children ?? [])
+        .find(c => c.tag === 'xdomea:Bezeichnung')?.value?.['#text'];
+      if (label) {
+        const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        processes.push({ id, title: label });
+      }
+    }
+    return { processes };
+  }
+
+  const bezeichnungen = [...sourceText.matchAll(/<xdomea:Bezeichnung>([^<]+)<\/xdomea:Bezeichnung>/g)]
+    .map(m => m[1]);
+
+  for (const title of bezeichnungen) {
+    const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    processes.push({ id, title });
+  }
+
+  return { processes };
+}
+/**
+ * Ingest xDOMEA source (url | xml | json) and normalize to:
+ *   { ok: true, items: [{ id, title }] }
+ *
+ * payload: { url?: string, xml?: string, json?: object|string }
+ */
+export async function ingestXdomea(env, payload = {}) {
+  try {
+    let sourceText;
+    let contentType = 'application/xml';
+
+    // 1) Quelle bestimmen
+    if (payload.xml) {
+      sourceText = String(payload.xml);
+      contentType = 'application/xml';
+    } else if (payload.json) {
+      if (typeof payload.json === 'string') {
+        sourceText = payload.json;
+        contentType = 'application/json';
+      } else {
+        sourceText = JSON.stringify(payload.json);
+        contentType = 'application/json';
+      }
+    } else if (payload.url) {
+      const resp = await fetch(payload.url, {
+        headers: {
+          accept: 'application/json,application/xml;q=0.9,*/*;q=0.8'
+        }
+      });
+      if (!resp.ok) {
+        return { ok: false, error: `fetch_failed:${resp.status}` };
+      }
+      contentType = resp.headers.get('content-type') || 'application/octet-stream';
+      sourceText = await resp.text();
+    } else {
+      return { ok: false, error: 'missing_source' };
+    }
+
+    // 2) In RoPA-Prozesse übersetzen (nutzt euren bestehenden Parser)
+    const { processes } = await parseXdomeaToRopa(sourceText, contentType);
+
+    const items = (processes || []).map(p => ({
+      id: p.id,
+      title: p.title
+    }));
+
+    return { ok: true, items };
+  } catch (e) {
+    return {
+      ok: false,
+      error: 'server_error',
+      detail: String(e?.message || e)
+    };
+  }
+}

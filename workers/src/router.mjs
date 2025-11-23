@@ -1,5 +1,6 @@
 // workers/src/router.mjs
-import { json, ok, notFound, badRequest, withCORS, parseUrl } from '../libs/base.mjs';
+
+import { json, ok, notFound, badRequest, withCORS, parseUrl, okOptions } from '../libs/base.mjs';
 import { requireApiKey } from '../libs/secure.mjs';
 import { templateSsp } from '../libs/oscal.mjs';
 import {
@@ -7,8 +8,12 @@ import {
   readTenantJson,
   initTenant,
   updateTenant,
-  deleteTenant
+  deleteTenant,
+  saveTenantDraft, 
+  mergeTenantBranch
 } from '../libs/tenant.mjs';
+import { ropaPreviewHandler, createBundleHandler } from '../handlers/ropa.mjs';
+
 
 // Helper: simple path matcher :param
 function match(pathPattern, actualPath) {
@@ -27,8 +32,14 @@ function match(pathPattern, actualPath) {
   return params;
 }
 
+
+
 export async function route(request, env, ctx) {
   const { pathname, searchParams } = parseUrl(request);
+  
+  if (request.method === 'OPTIONS' && pathname.startsWith('/api/')) {
+    return okOptions(); // setzt Access-Control-Allow-Methods/Headers
+  }
 
   // Health
   if (request.method === 'GET' && pathname === '/api/healthz') {
@@ -60,6 +71,7 @@ export async function route(request, env, ctx) {
     return ok(tpl);
   }
 
+
   // --- Tenants ---
   // GET tenant meta
   {
@@ -85,6 +97,36 @@ export async function route(request, env, ctx) {
       return ok({ ok: true, orgId: m.orgId, created: { prUrl: res.prUrl, branch: res.branch }, next: res.next });
     }
   }
+
+  // PUT /api/tenants/:orgId/save?ref=...
+    {
+    const m = match('/api/tenants/:orgId/save', pathname);
+      if (request.method === 'PUT' && m ) {
+        const gate = await requireApiKey(request, env);
+        if (!gate.ok) return gate.response;
+        const ref = searchParams.get('ref');
+        if (!ref) return badRequest('missing ref');
+        const body = await request.json().catch(()=> ({}));
+        const res = await saveTenantDraft(env, m.orgId, body, ref);
+        if (!res?.ok) return json({ error: res?.error || 'save_failed' }, 502);
+        return ok({ ok:true, branch: res.branch, prUrl: res.prUrl ?? null });
+      }
+    }
+  // POST /api/tenants/:orgId/merge?ref=...&base=...
+    {
+    const m = match('/api/tenants/:orgId/merge', pathname);
+      if (request.method === 'POST' && m ) {
+        const gate = await requireApiKey(request, env);
+        if (!gate.ok) return gate.response;
+        const ref = searchParams.get('ref');
+        if (!ref) return badRequest('missing ref');
+        const base = searchParams.get('base') || (env.DATA_BASE || 'main');
+        //const res = await mergeTenantDraft(env, m.orgId, ref, base);
+        const res = await mergeTenantBranch(env, { head: ref, base });
+        if (!res?.ok) return json({ error: res?.error || 'merge_failed' }, 502);
+        return ok({ ok:true, merged: !!res.merged, base, ref, commitSha: res.commitSha ?? null });
+      }
+    }
 
   // PUT update tenant
   {
@@ -168,6 +210,43 @@ export async function route(request, env, ctx) {
   }
 
   // --- RoPA (process register) ---
+
+  if (request.method === 'GET' && pathname.startsWith('/api/ropa/preview')) {
+    return ropaPreviewHandler(request, env);
+  }
+
+  // Create bundle from UI
+  {
+    const m = match('/api/tenants/:orgId/bundles', pathname);
+    if (request.method === 'POST' && m) {
+      const gate = await requireApiKey(request, env);
+      if (!gate.ok) return gate.response;
+      return createBundleHandler(request, env, m);
+    }
+  }
+  {
+    const m = match('/api/ingest/xdomea', pathname);
+    if (request.method === 'POST' && m) {
+      const { ingestXdomea } = await import('../libs/mapping.mjs');
+      const payload = await request.json().catch(()=> ({})); // { url?: string, xml?: string }
+      const res = await ingestXdomea(env, payload);
+      if (!res?.ok) return badRequest(res?.error || 'ingest_failed');
+      return ok({ items: res.items }); // gleiche Struktur wie /api/tenants/:orgId/ropa
+    }
+  }
+  {
+    const m = match('/api/tenants/:orgId/ropa/import', pathname);
+    if (request.method === 'POST' && m) {
+      const gate = await requireApiKey(request, env);
+      if (!gate.ok) return gate.response;
+      const { importXdomeaIntoTenant } = await import('../libs/tenantRopa.mjs');
+      const payload = await request.json().catch(()=> ({})); // { url?: string, xml?: string, template?: 'minimal'|'domain' }
+      const res = await importXdomeaIntoTenant(env, m.orgId, payload);
+      if (!res?.ok) return badRequest(res?.error || 'import_failed');
+      return ok({ ok:true, created: res.created, next: res.next }); // z.B. Liste angelegter SSP-IDs
+    }
+  }
+
   {
     const m = match('/api/tenants/:orgId/ropa', pathname);
     if (request.method === 'GET' && m) {

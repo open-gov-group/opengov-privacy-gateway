@@ -29,6 +29,14 @@ async function ghGetSha(env, path, ref) {
   return meta && meta.sha || null;
 }
 
+function ghHeaders(env) {
+  return {
+    authorization: `Bearer ${env.GH_TOKEN_DATA}`,
+    accept: 'application/vnd.github+json',
+    'content-type': 'application/json'
+  };
+}
+
 async function ghPutFile(env, branch, path, contentJson, message) {
   const body = {
     message,
@@ -132,3 +140,51 @@ export async function writeSSP(env, orgId, sspId, doc) {
   const prUrl = await ghOpenPr(env, branch, `[SSP] ${orgId}/${sspId}`);
   return { ok:true, branch, prUrl };
 }
+// libs/tenantProcedures.mjs
+// putTenantBundle: mehrere Dateien (JSON) in einen Tenant/Prozess-Ordner schreiben (Contents API)
+
+
+// Hilfsfunktion: einzelne JSON-Datei via Contents API schreiben
+async function putJsonContent(env, branch, repoPath, obj, message) {
+  // 1) Dateiinhalt base64
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
+  // 2) Prüfen, ob die Datei schon existiert (SHA holen)
+  const getUrl = `https://api.github.com/repos/${env.DATA_OWNER}/${env.DATA_REPO}/contents/${encodeURIComponent(repoPath)}?ref=${encodeURIComponent(branch)}`;
+  let sha = undefined;
+  const getResp = await fetch(getUrl, { headers: ghHeaders(env) });
+  if (getResp.ok) {
+    const j = await getResp.json();
+    sha = j.sha;
+  }
+  // 3) PUT
+  const putUrl = `https://api.github.com/repos/${env.DATA_OWNER}/${env.DATA_REPO}/contents/${encodeURIComponent(repoPath)}`;
+  const body = {
+    message,
+    content,
+    branch,
+    ...(sha ? { sha } : {})
+  };
+  const resp = await fetch(putUrl, { method: 'PUT', headers: ghHeaders(env), body: JSON.stringify(body) });
+  return resp.ok;
+}
+
+/**
+ * putTenantBundle
+ * @param {Env} env - Worker env (GH_TOKEN_DATA, DATA_OWNER, DATA_REPO…)
+ * @param {string} orgId - Tenant-OrgID
+ * @param {string} procId - Prozess-ID (z. B. 'proc-1')
+ * @param {Array<{ path: string, content: any }>} files - zu schreibende Dateien relativ zum Tenant-Root
+ * @param {string} branch - Ziel-Branch
+ * @param {string} commitPrefix - optionaler Prefix für Commit-Nachrichten
+ */
+export async function putTenantBundle(env, orgId, procId, files, branch, commitPrefix = 'chore(bundle)') {
+  // Tenant-Root unter data/
+  const root = `data/tenants/${orgId}/procedures/${procId}`;
+  for (const f of files) {
+    const fullPath = `${root}/${f.path}`.replace(/\/+/g, '/');
+    const ok = await putJsonContent(env, branch, fullPath, f.content, `${commitPrefix}: write ${fullPath}`);
+    if (!ok) return false;
+  }
+  return true;
+}
+

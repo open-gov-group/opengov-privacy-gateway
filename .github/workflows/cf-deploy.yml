@@ -8,16 +8,19 @@ on:
       - ".github/workflows/cf-deploy.yml"
   workflow_dispatch:
 
+    
 jobs:
   deploy-staging:
     runs-on: ubuntu-latest
 
+    # Do NOT shadow these names in steps; keep secrets here and echo them only where needed.
     env:
       CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      # Aliase nur für Lesbarkeit – keine gleichen Namen wie Secrets benutzen!
-      STAGING_APP_API_KEY: ${{ secrets.STAGING_APP_API_KEY }}
-      STAGING_GH_TOKEN_DATA: ${{ secrets.STAGING_GH_TOKEN_DATA }}
+
+    defaults:
+      run:
+        working-directory: workers  # <- folder with wrangler.toml
 
     steps:
       - uses: actions/checkout@v4
@@ -25,32 +28,37 @@ jobs:
       - name: Install Wrangler
         run: npm i -g wrangler@4
 
-      # --- Secrets zuerst setzen (per stdin) ---
-      - name: Put secret GH_TOKEN_DATA (staging)
+      # -------- SECRETS (sensitive) --------
+      - name: Secret: GH_TOKEN_DATA (staging)
         run: |
-          printf '%s' "${STAGING_GH_TOKEN_DATA}" | \
-          wrangler secret put GH_TOKEN_DATA --env=staging --quiet
+          echo -n "${{ secrets.STAGING_GH_TOKEN_DATA }}" | \
+          wrangler secret put GH_TOKEN_DATA --env=staging
 
-      - name: Put secret APP_API_KEY (staging)
+      - name: Secret: APP_API_KEY (staging)
         run: |
-          printf '%s' "${STAGING_APP_API_KEY}" | \
-          wrangler secret put APP_API_KEY --env=staging --quiet
+          echo -n "${{ secrets.STAGING_APP_API_KEY }}" | \
+          wrangler secret put APP_API_KEY --env=staging
 
-      # --- dann Vars (nicht-sensibel) ---
-      - name: Put vars (staging)
+      - name: Secret: JWT_SECRET (staging)
         run: |
-          # WICHTIG: DATA_BASE ist ein BRANCH-NAME, keine URL!
-          wrangler vars put MODE                --env=staging --quiet --value "mock" 
-          wrangler vars put DATA_OWNER          --env=staging --quiet --value "open-gov-group"
-          wrangler vars put DATA_REPO           --env=staging --quiet --value "opengov-privacy-data"
-          wrangler vars put DATA_BASE           --env=staging --quiet --value "main"
-          wrangler vars put DEFAULT_PROFILE_HREF --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/build/profile_resolved_catalog.json"
-          wrangler vars put TEMPLATE_SSP_HREF    --env=staging --quiet --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+          echo -n "${{ secrets.STAGING_JWT_SECRET }}" | \
+          wrangler secret put JWT_SECRET --env=staging
 
-          # Optional: JWT-Anwendungsmetadaten (öffentlich, daher vars)
-          wrangler vars put JWT_ISS --env=staging --quiet --value "open-privacy-api"
-          wrangler vars put JWT_AUD --env=staging --quiet --value "opengov-privacy-ui"
-          wrangler vars put JWT_ALG --env=staging --quiet --value "HS256"
+      # -------- VARS (non-sensitive) --------
+      - name: Vars: staging
+        run: |
+          # IMPORTANT: DATA_BASE is a BRANCH, not a URL
+          wrangler vars put MODE                --env=staging --value "mock-no-auth"
+          wrangler vars put DATA_OWNER          --env=staging --value "open-gov-group"
+          wrangler vars put DATA_REPO           --env=staging --value "opengov-privacy-data"
+          wrangler vars put DATA_BASE           --env=staging --value "main"
+
+          wrangler vars put DEFAULT_PROFILE_HREF --env=staging --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/build/profile_resolved_catalog.json"
+          wrangler vars put TEMPLATE_SSP_HREF    --env=staging --value "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-oscal/main/oscal/ssp/ssp_template_ropa.json"
+
+          wrangler vars put JWT_ISS --env=staging --value "open-privacy-api"
+          wrangler vars put JWT_AUD --env=staging --value "opengov-privacy-ui"
+          wrangler vars put JWT_ALG --env=staging --value "HS256"
 
       - name: Deploy (staging)
         run: wrangler deploy --env=staging

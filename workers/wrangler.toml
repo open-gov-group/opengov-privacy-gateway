@@ -4,7 +4,7 @@ main = "worker.mjs"
 compatibility_date = "2024-11-01"
 account_id = "ba2826d2487315d901dcf1078d091d48"
 workers_dev = true
-preview_urls = false
+#preview_urls = false
 
 # Optional: nur für lokales `wrangler dev` ohne --env 
 [vars]
@@ -38,7 +38,7 @@ MODE = "mock-no-auth"
 MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
 DATA_OWNER = "open-gov-group"
 DATA_REPO  = "opengov-privacy-data"
-DATA_BASE  = "https://api.github.com"
+DATA_BASE  = "main"
 
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
@@ -59,7 +59,7 @@ MODE = "prod"
 MOCK_BASE = "https://raw.githubusercontent.com/open-gov-group/opengov-privacy-mappings/main/build"
 DATA_OWNER = "open-gov-group"
 DATA_REPO  = "opengov-privacy-data"
-DATA_BASE  = "https://api.github.com"
+DATA_BASE  = "main"
 
 JWT_ISS = "open-privacy-api"
 JWT_AUD = "opengov-privacy-ui"
